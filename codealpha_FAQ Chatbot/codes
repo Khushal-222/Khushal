@@ -1,0 +1,69 @@
+import nltk
+import string
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+
+lemmatizer = WordNetLemmatizer()
+stop_words = set(stopwords.words('english'))
+
+def preprocess(text):
+    text = text.lower()
+    tokens = nltk.word_tokenize(text)
+    clean_tokens = [
+        lemmatizer.lemmatize(token)
+        for token in tokens
+        if token not in string.punctuation and token not in stop_words
+    ]
+    return " ".join(clean_tokens)
+
+
+
+
+  import json
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from .preprocess import preprocess
+
+class FAQMatcher:
+    def __init__(self, faq_file):
+        with open(faq_file, 'r') as f:
+            self.faqs = json.load(f)
+        self.questions = [faq['question'] for faq in self.faqs]
+        self.answers = [faq['answer'] for faq in self.faqs]
+
+        self.preprocessed_questions = [preprocess(q) for q in self.questions]
+        self.vectorizer = TfidfVectorizer()
+        self.tfidf_matrix = self.vectorizer.fit_transform(self.preprocessed_questions)
+
+    def get_best_match(self, user_question):
+        user_preprocessed = preprocess(user_question)
+        user_vec = self.vectorizer.transform([user_preprocessed])
+        similarity_scores = cosine_similarity(user_vec, self.tfidf_matrix)
+        best_index = similarity_scores.argmax()
+        return self.answers[best_index]
+
+
+
+
+  from .matcher import FAQMatcher
+
+class Chatbot:
+    def __init__(self, faq_path='data/faqs.json'):
+        self.matcher = FAQMatcher(faq_path)
+
+    def get_response(self, user_input):
+        return self.matcher.get_best_match(user_input)
+
+if __name__ == "__main__":
+    bot = Chatbot()
+    print("Type 'exit' to quit.")
+    while True:
+        user = input("You: ")
+        if user.lower() in ["exit", "quit"]:
+            break
+        print("Bot:", bot.get_response(user))
+
